@@ -65,7 +65,7 @@ class DS1302:
     
     def _read_reg(self, register):
         """Lower level read of register, returns read"""
-        # register += 1 # always is reg plus one, ?add here or on comand call?
+        register += 1              # always is reg plus one
         self.ce.value(1)
         self._write_byte(register)
         data = self._read_byte()
@@ -84,15 +84,17 @@ class DS1302:
     def datetime(self, datetime=None):
         """Sets a datetime if given, else returns the current datetime \n
         datetime tuple is (year, month, day, hour, minuutes, second)"""
-        if datetime:
-            return (year, month, day, hour, minutes, seconds)
+        # TO DO: create a function to calculate day of week
+        if datetime == None:
+            return (year, month, weekday, day, hour, minutes, seconds)
         else:
             self.year(datetime[0])
             self.month(datetime[1])
-            self.day(datetime[2])
-            self.hours(datetime[3])
-            self.minutes(datetime[4])
-            self.seconds(datetime[5])
+            self.week_day(datetime[2])
+            self.day(datetime[3])
+            self.hours(datetime[4])
+            self.minutes(datetime[5])
+            self.seconds(datetime[6])
             
     
     def seconds(self, second=None):
@@ -100,7 +102,7 @@ class DS1302:
         | 7  | 6 - 4  |  3 - 0   | Range | \n
         | CH | 10 sec | seconds  | 00-59 |"""
         if second == None:
-            return self._read_reg(REG_SECONDS+1)
+            return self._read_reg(REG_SECONDS)
         else:
             self._set_reg(REG_SECONDS, second)
     
@@ -109,7 +111,7 @@ class DS1302:
         | 7 | 6 - 4  |  3 - 0  | Range | \n
         | * | 10 min | minutes | 00-59 |"""
         if minute == None:
-            return self._read_reg(REG_MINUTES+1)
+            return self._read_reg(REG_MINUTES)
         else:
             self._set_reg(REG_MINUTES, second)
     
@@ -118,7 +120,7 @@ class DS1302:
         |   7    | 6 |        5      |  4   | 3 - 0  |    Range    | \n
         | 12/^24 | 0 | ^AM/PM \ 10hr | 10hr | Hour   | 1-12 \ 0-23 |"""
         if hour == None:
-            return self._read_reg(REG_HOUR+1)
+            return self._read_reg(REG_HOUR)
         else:
             self._set_reg(REG_HOUR, hour)
             
@@ -128,7 +130,7 @@ class DS1302:
         | 7 - 6 | 5 - 4  | 3 - 0 | Range | \n
         |   0   | 10 day |  day  | 01-31 |"""
         if curr_date == None:
-            return self._read_reg(REG_DATE+1)
+            return self._read_reg(REG_DATE)
         else:
             self._set_reg(REG_DATE, curr_date)
     
@@ -137,16 +139,16 @@ class DS1302:
         | 7 - 5 |    4    |  3 - 0 | Range | \n
         |   0   | 10 mnth |  mnth  | 01-12 |"""
         if months == None:
-            return self._read_reg(REG_MONTH+1)
+            return self._read_reg(REG_MONTH)
         else:
             self._set_reg(REG_MONTH, months)
     
-    def day(self, days=None):
+    def week_day(self, days=None):
         """Sets the day of the week if given, else returns the current day \n
         | 7 - 3 | 2 - 0  | Range | \n
         |   0   |  day   | 01-07 |"""
         if days == None:
-            return self._read_reg(REG_WEEK_DAY+1)
+            return self._read_reg(REG_WEEK_DAY)
         else:
             self._set_reg(REG_WEEK_DAY, days)
     
@@ -155,7 +157,7 @@ class DS1302:
         | 7 - 4  | 3 - 0  | Range | \n
         |  10yr  | year   | 00-99 |"""
         if years == None:
-            return self._read_reg(REG_YEAR+1)
+            return self._read_reg(REG_YEAR)
         else:
             self._set_reg(REG_YEAR, years)
     
