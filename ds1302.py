@@ -8,21 +8,24 @@
 #    X2 -|     |- I/O
 #   GND -|_____|- CE
 #
-# Guia personal para desarrollo personal, par quitar al final del proyecto
-# azul - Vcc - riel de 3V3
-# morado - GND - riel de gnd
-# gris - CLK - pin 16
-# blanco - DAT pin 17
-# negro - RST - pin 18
+# Structure of a Byte
+# | 7 |    6    | 5  | 4  | 3  | 2  | 1  |   0    |
+# | 1 | RAM/^CK | A4 | A3 | A2 | A1 | A0 | RD/^WR |
+# Writing Sequence: little endian
+#
 
-REG_SECONDS = 0x80
-REG_MINUTES = 0x82
-REG_HOUR    = 0x84
-REG_DATE    = 0x86
-REG_MONTH   = 0x88
-REG_DAY     = 0x8A
-REG_YEAR    = 0x8C
-REG_RAM     = 0xC0
+from machine import Pin
+
+REG_SECONDS  = 0x80
+REG_MINUTES  = 0x82
+REG_HOUR     = 0x84
+REG_DATE     = 0x86
+REG_MONTH    = 0x88
+REG_WEEK_DAY = 0x8A
+REG_YEAR     = 0x8C
+REG_WP       = 0x8E  # Write protect
+REG_RAM      = 0xC0
+REG_CONTROL  = 0x90
 
 class DS1302:
     
@@ -31,39 +34,154 @@ class DS1302:
         self.dio = dio
         self.ce = ce
         self.clk = clk
-        
-    def _write_byte(self):
-        pass
+        self.clk.init(Pin.OUT)
+        self.ce.init(Pin.OUT)
+    
+    # Register methods
+    def _write_byte(self, data):
+        """Low level write to I/O pin"""
+        self.dio.init(Pin.OUT)
+        for i in range(8):
+            self.dio.value((data>>i) & 1)
+            self.clk.value(1)
+            self.clk.value(0)
         
     def _read_byte(self):
-        pass
+        """Low level read of I/O pin"""
+        self.dio.init(Pin.IN)
+        data = 0
+        for i in range(8):
+            data = data | (self.dio.value()<<i)
+            self.clk.value(1)
+            self.clk.value(0)
+        return data
     
-    def _set_reg(self):
-        pass
+    def _set_reg(self, register, data):
+        """Higher level write of register, takes register and data"""
+        self.ce.value(1)
+        self._write_byte(register)
+        self._write_byte(data)
+        self.ce.value(0)
     
-    def _read_reg(self):
-        pass
+    def _read_reg(self, register):
+        """Lower level read of register, returns read"""
+        # register += 1 # always is reg plus one, ?add here or on comand call?
+        self.ce.value(1)
+        self._write_byte(register)
+        data = self._read_byte()
+        self.ce.value(0)
+        return data
     
-    def second(self, data=None):
-        pass
+    def _hex_to_dec(self, number):
+        """Needed because DS1302 returns hex numbers as if they were decimal"""
+        return (number//16)*10 + (number%16)
     
-    def minutes(self, data=None):
-        pass
+    def _dec_to_hex(self, number):
+        """Needed because DS1302 receives hex numbers as if they were decimal"""
+        return (number//10)*16 + (number%10)
     
-    def hour(self, data=None):
-        pass
+    # Time methods
+    def datetime(self, datetime=None):
+        """Sets a datetime if given, else returns the current datetime \n
+        datetime tuple is (year, month, day, hour, minuutes, second)"""
+        if datetime:
+            return (year, month, day, hour, minutes, seconds)
+        else:
+            self.year(datetime[0])
+            self.month(datetime[1])
+            self.day(datetime[2])
+            self.hours(datetime[3])
+            self.minutes(datetime[4])
+            self.seconds(datetime[5])
+            
     
-    def date(self, data=None):
-        pass
+    def seconds(self, second=None):
+        """Sets _ if given, else returns the current \n
+        | 7  | 6 - 4  |  3 - 0   | Range | \n
+        | CH | 10 sec | seconds  | 00-59 |"""
+        if second == None:
+            return self._read_reg(REG_SECONDS+1)
+        else:
+            self._set_reg(REG_SECONDS, second)
     
-    def month(self, data=None):
-        pass
+    def minutes(self, minute=None):
+        """Sets minutes if given, else returns the current minute \n
+        | 7 | 6 - 4  |  3 - 0  | Range | \n
+        | * | 10 min | minutes | 00-59 |"""
+        if minute == None:
+            return self._read_reg(REG_MINUTES+1)
+        else:
+            self._set_reg(REG_MINUTES, second)
     
-    def day(self, data=None):
-        pass
+    def hours(self, hour=None):
+        """Sets the hour if given, else returns the current hour \n
+        |   7    | 6 |        5      |  4   | 3 - 0  |    Range    | \n
+        | 12/^24 | 0 | ^AM/PM \ 10hr | 10hr | Hour   | 1-12 \ 0-23 |"""
+        if hour == None:
+            return self._read_reg(REG_HOUR+1)
+        else:
+            self._set_reg(REG_HOUR, hour)
+            
     
-    def year(self, data=None):
-        pass
+    def date(self, curr_date=None):
+        """Sets day of month if given, else returns the current day of month \n
+        | 7 - 6 | 5 - 4  | 3 - 0 | Range | \n
+        |   0   | 10 day |  day  | 01-31 |"""
+        if curr_date == None:
+            return self._read_reg(REG_DATE+1)
+        else:
+            self._set_reg(REG_DATE, curr_date)
     
+    def month(self, months=None):
+        """Sets month if given, else returns the current month \n
+        | 7 - 5 |    4    |  3 - 0 | Range | \n
+        |   0   | 10 mnth |  mnth  | 01-12 |"""
+        if months == None:
+            return self._read_reg(REG_MONTH+1)
+        else:
+            self._set_reg(REG_MONTH, months)
+    
+    def day(self, days=None):
+        """Sets the day of the week if given, else returns the current day \n
+        | 7 - 3 | 2 - 0  | Range | \n
+        |   0   |  day   | 01-07 |"""
+        if days == None:
+            return self._read_reg(REG_WEEK_DAY+1)
+        else:
+            self._set_reg(REG_WEEK_DAY, days)
+    
+    def year(self, years=None):
+        """Sets year if given, else returns the current year\n
+        | 7 - 4  | 3 - 0  | Range | \n
+        |  10yr  | year   | 00-99 |"""
+        if years == None:
+            return self._read_reg(REG_YEAR+1)
+        else:
+            self._set_reg(REG_YEAR, years)
+    
+    def clock_halt(self, halt=True):
+        """Halts the clock if called, if arg halt=None resumes the clock \n
+        sets or lowers the 7th bit of the seconds register"""
+        if clock == None:
+            command = self.seconds() | 0x10000000 # 0x80
+        else:
+            command = self.seconds() & 0x01111111 # 0x7F
+        self.seconds(command)
+    
+    # RAM methods
     def ram(self, data=None):
+        """Reads a section in RAM memory"""
         pass
+    
+    def ram_burst(self, data=None):
+        """Returns all of the RAM in a burst"""
+        pass
+    
+#
+# Guia personal para desarrollo personal, para quitar al final del proyecto
+#   azul - Vcc - riel de 3V3
+# morado - GND - riel de gnd
+#   gris - CLK - pin 16
+# blanco - DAT - pin 17
+#  negro - RST - pin 18
+#
