@@ -58,6 +58,7 @@ class DS1302:
     
     def _set_reg(self, register, data):
         """Higher level write of register, takes register and data"""
+        data = self._dec_to_hex(data)
         self.ce.value(1)
         self._write_byte(register)
         self._write_byte(data)
@@ -65,10 +66,11 @@ class DS1302:
     
     def _read_reg(self, register):
         """Lower level read of register, returns read"""
-        register += 1              # always is reg plus one
+        register += 1                   # always is reg plus one
         self.ce.value(1)
         self._write_byte(register)
         data = self._read_byte()
+        data = self._hex_to_dec(data)
         self.ce.value(0)
         return data
     
@@ -81,20 +83,29 @@ class DS1302:
         return (number//10)*16 + (number%10)
     
     # Time methods
-    def datetime(self, datetime=None):
+    def datetime(self, date_time=None):
         """Sets a datetime if given, else returns the current datetime \n
         datetime tuple is (year, month, day, hour, minuutes, second)"""
         # TO DO: create a function to calculate day of week
-        if datetime == None:
-            return (year, month, weekday, day, hour, minutes, seconds)
+        if date_time == None:
+            print("returning date time ")
+            return (
+                self.year(),
+                self.month(),
+                self.week_day(),
+                self.date(),
+                self.hours(),
+                self.minutes(),
+                self.seconds())
         else:
-            self.year(datetime[0])
-            self.month(datetime[1])
-            self.week_day(datetime[2])
-            self.day(datetime[3])
-            self.hours(datetime[4])
-            self.minutes(datetime[5])
-            self.seconds(datetime[6])
+            print("setting date and time")
+            self.year(date_time[0])
+            self.month(date_time[1])
+            self.week_day(date_time[2])
+            self.date(date_time[3])
+            self.hours(date_time[4])
+            self.minutes(date_time[5])
+            self.seconds(date_time[6])
             
     
     def seconds(self, second=None):
@@ -113,7 +124,7 @@ class DS1302:
         if minute == None:
             return self._read_reg(REG_MINUTES)
         else:
-            self._set_reg(REG_MINUTES, second)
+            self._set_reg(REG_MINUTES, minute)
     
     def hours(self, hour=None):
         """Sets the hour if given, else returns the current hour \n
@@ -164,14 +175,14 @@ class DS1302:
     def clock_halt(self, halt=True):
         """Halts the clock if called, if arg halt=None resumes the clock \n
         sets or lowers the 7th bit of the seconds register"""
-        if clock == None:
+        if halt == True:
             command = self.seconds() | 0x10000000 # 0x80
         else:
             command = self.seconds() & 0x01111111 # 0x7F
         self.seconds(command)
     
     # RAM methods
-    def ram(self, data=None):
+    def ram(self, ram_adress, data=None):
         """Reads a section in RAM memory"""
         pass
     
